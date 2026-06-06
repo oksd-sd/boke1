@@ -1,0 +1,6 @@
+{
+  "name": "Zen Blog (Hugo Minimalist Designer)",
+  "description": "A static blogging workspace designed with Zen minimalist aesthetics and full Hugo multi-language support, article search, comment manager, and taxonomic categorization.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}
