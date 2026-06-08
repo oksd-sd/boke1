@@ -18,11 +18,19 @@ export default function App() {
   const [comments, setComments] = useState<Comment[]>(defaultComments);
   const [blogLanguage, setBlogLanguage] = useState<'zh' | 'en'>('zh');
 
+  // Authentication State
+  const [isLoggedIn, setIsLoggedIn] = useState(false);
+  const [showLoginModal, setShowLoginModal] = useState(false);
+  const [usernameInput, setUsernameInput] = useState('');
+  const [passwordInput, setPasswordInput] = useState('');
+  const [loginError, setLoginError] = useState('');
+
   // Sync data with localStorage to persist user edits across reloads
   useEffect(() => {
     const savedConfig = localStorage.getItem('hugo_zen_config');
     const savedPosts = localStorage.getItem('hugo_zen_posts');
     const savedComments = localStorage.getItem('hugo_zen_comments');
+    const savedLogin = localStorage.getItem('hugo_zen_is_logged_in');
 
     if (savedConfig) {
       try { setConfig(JSON.parse(savedConfig)); } catch (e) { console.error(e); }
@@ -32,6 +40,9 @@ export default function App() {
     }
     if (savedComments) {
       try { setComments(JSON.parse(savedComments)); } catch (e) { console.error(e); }
+    }
+    if (savedLogin === 'true') {
+      setIsLoggedIn(true);
     }
   }, []);
 
@@ -64,111 +75,130 @@ export default function App() {
     localStorage.setItem('hugo_zen_comments', JSON.stringify(updated));
   };
 
+  const handleDeleteComment = (id: string) => {
+    const updated = comments.filter(c => c.id !== id);
+    setComments(updated);
+    localStorage.setItem('hugo_zen_comments', JSON.stringify(updated));
+  };
+
+  const handleUpdateCategoryGlobally = (oldName: string, newName: string) => {
+    const updated = posts.map(post => {
+      if (post.categories.includes(oldName)) {
+        return {
+          ...post,
+          categories: post.categories.map(c => c === oldName ? newName : c)
+        };
+      }
+      return post;
+    });
+    setPosts(updated);
+    localStorage.setItem('hugo_zen_posts', JSON.stringify(updated));
+  };
+
+  const handleDeleteCategoryGlobally = (catName: string) => {
+    const updated = posts.map(post => {
+      return {
+        ...post,
+        categories: post.categories.filter(c => c !== catName)
+      };
+    });
+    setPosts(updated);
+    localStorage.setItem('hugo_zen_posts', JSON.stringify(updated));
+  };
+
+  const handleUpdateTagGlobally = (oldName: string, newName: string) => {
+    const updated = posts.map(post => {
+      if (post.tags.includes(oldName)) {
+        const mappedTags = post.tags.map(t => t === oldName ? newName : t);
+        return {
+          ...post,
+          // De-duplicate tags
+          tags: Array.from(new Set(mappedTags))
+        };
+      }
+      return post;
+    });
+    setPosts(updated);
+    localStorage.setItem('hugo_zen_posts', JSON.stringify(updated));
+  };
+
+  const handleDeleteTagGlobally = (tagName: string) => {
+    const updated = posts.map(post => {
+      return {
+        ...post,
+        tags: post.tags.filter(t => t !== tagName)
+      };
+    });
+    setPosts(updated);
+    localStorage.setItem('hugo_zen_posts', JSON.stringify(updated));
+  };
+
+  const handleLogout = () => {
+    setIsLoggedIn(false);
+    localStorage.removeItem('hugo_zen_is_logged_in');
+    setActiveTab('preview');
+  };
+
   const resetAllData = () => {
-    if (confirm("是否确认还原所有文章、评论和配置文件至初始禅意预置状态？")) {
+    if (confirm("是否确认还原所有文章、评论和配置文件至初始禅意预置状态？这会同时清除登录态。")) {
       localStorage.removeItem('hugo_zen_config');
       localStorage.removeItem('hugo_zen_posts');
       localStorage.removeItem('hugo_zen_comments');
+      localStorage.removeItem('hugo_zen_is_logged_in');
+      setIsLoggedIn(false);
       setConfig(defaultHugoConfig);
       setPosts(defaultPosts);
       setComments(defaultComments);
       setBlogLanguage('zh');
+      setActiveTab('preview');
     }
   };
 
   return (
-    <div className="bg-[#FAF8F5] min-h-screen text-[#2C2A29] font-sans antialiased">
+    <div className="bg-[#FBF9F5] min-h-screen text-[#2C2A29] font-sans antialiased relative">
       
-      {/* Visual Header Controller Bar */}
-      <nav className="sticky top-0 z-50 bg-[#F5F2EC] border-b border-[#E3DEC9] px-6 py-3.5 flex flex-col sm:flex-row items-center justify-between gap-4 shadow-xs select-none">
-        
-        {/* Logo and Core Identity */}
-        <div className="flex items-center gap-2.5">
-          <div className="w-8 h-8 rounded-full bg-[#8E7B65] flex items-center justify-center shadow-xs">
-            <Feather className="w-4 h-4 text-[#FBF9F5]" />
-          </div>
-          <div>
-            <div className="flex items-center gap-1.5 leading-none">
-              <span className="font-serif font-semibold text-sm tracking-tight text-[#1A1918]">ZenBlog Hugo Designer</span>
-              <span className="text-[9px] bg-[#EBE4D5] text-[#7A6C58] px-1.5 py-0.5 rounded font-mono font-bold">STATION</span>
-            </div>
-            <p className="text-[10px] text-[#8C8172] font-sans mt-0.5 uppercase tracking-wider font-semibold">
-              静水禅境 · 静态博客构建工坊
-            </p>
-          </div>
-        </div>
-
-        {/* Tab switchers */}
-        <div className="flex items-center bg-[#EAE3D4]/80 p-1 rounded-lg border border-[#DDD5C2] shadow-inner">
-          <button
-            onClick={() => setActiveTab('preview')}
-            className={`flex items-center gap-1.5 px-4 py-1.5 rounded-md text-xs font-semibold tracking-wide transition-all ${
-              activeTab === 'preview'
-                ? 'bg-[#8E7B65] text-[#FAF8F5] shadow-xs'
-                : 'text-[#6B5E4F] hover:text-[#2C2A29]'
-            }`}
-          >
-            <Eye className="w-3.5 h-3.5" />
-            <span>前台预览 (Preview)</span>
-          </button>
-
-          <button
-            onClick={() => setActiveTab('admin')}
-            className={`flex items-center gap-1.5 px-4 py-1.5 rounded-md text-xs font-semibold tracking-wide transition-all ${
-              activeTab === 'admin'
-                ? 'bg-[#8E7B65] text-[#FAF8F5] shadow-xs'
-                : 'text-[#6B5E4F] hover:text-[#2C2A29]'
-            }`}
-          >
-            <Terminal className="w-3.5 h-3.5" />
-            <span>静态工作台 (Hugo Studio)</span>
-          </button>
-
-          <button
-            onClick={() => setActiveTab('readme')}
-            className={`flex items-center gap-1.5 px-4 py-1.5 rounded-md text-xs font-semibold tracking-wide transition-all ${
-              activeTab === 'readme'
-                ? 'bg-[#8E7B65] text-[#FAF8F5] shadow-xs'
-                : 'text-[#6B5E4F] hover:text-[#2C2A29]'
-            }`}
-          >
-            <BookOpen className="w-3.5 h-3.5" />
-            <span>设计指南 (Guides)</span>
-          </button>
-        </div>
-
-        {/* Action controls */}
-        <div className="flex items-center gap-3">
-          <button
-            onClick={resetAllData}
-            className="text-[10px] font-mono text-[#8C765C] border border-[#DDD5C2] hover:bg-[#EAE3D4] px-2.5 py-1.5 rounded transition-colors bg-white/50"
-          >
-            还原初始设定
-          </button>
-        </div>
-      </nav>
-
-      {/* Main Tab Render Window */}
+      {/* Immersive Client-facing Preview / Admin Switcher wrapper */}
       <AnimatePresence mode="wait">
         <motion.div
           key={activeTab}
-          initial={{ opacity: 0, y: 5 }}
-          animate={{ opacity: 1, y: 0 }}
+          initial={{ opacity: 0 }}
+          animate={{ opacity: 1 }}
           exit={{ opacity: 0 }}
-          transition={{ duration: 0.18 }}
+          transition={{ duration: 0.22 }}
         >
           {activeTab === 'preview' && (
-            <BlogReader
-              config={config}
-              posts={posts}
-              comments={comments}
-              language={blogLanguage}
-              setLanguage={setBlogLanguage}
-              onAddComment={handleAddComment}
-            />
+            <div className="relative">
+              {/* Invisible trigger to help revert demo state */}
+              <div className="absolute top-2 left-4 select-none opacity-20 hover:opacity-100 flex items-center gap-2 transition-opacity z-50">
+                <button
+                  type="button"
+                  onClick={resetAllData}
+                  className="text-[10px] font-mono text-[#8C765C] bg-[#FAF8F5]/80 px-2 py-1 rounded border border-[#E3DEC9]"
+                >
+                  还原初始设定 (Reset Data)
+                </button>
+              </div>
+
+              <BlogReader
+                config={config}
+                posts={posts}
+                comments={comments}
+                language={blogLanguage}
+                setLanguage={setBlogLanguage}
+                onAddComment={handleAddComment}
+                isLoggedIn={isLoggedIn}
+                onAdminClick={() => {
+                  if (isLoggedIn) {
+                    setActiveTab('admin');
+                  } else {
+                    setShowLoginModal(true);
+                  }
+                }}
+              />
+            </div>
           )}
 
-          {activeTab === 'admin' && (
+          {activeTab === 'admin' && isLoggedIn && (
             <AdminConsole
               config={config}
               updateConfig={handleUpdateConfig}
@@ -176,101 +206,136 @@ export default function App() {
               savePost={handleSavePost}
               onAddPost={handleAddPost}
               onDeletePost={handleDeletePost}
+              comments={comments}
+              onDeleteComment={handleDeleteComment}
+              onUpdateCategoryGlobally={handleUpdateCategoryGlobally}
+              onDeleteCategoryGlobally={handleDeleteCategoryGlobally}
+              onUpdateTagGlobally={handleUpdateTagGlobally}
+              onDeleteTagGlobally={handleDeleteTagGlobally}
+              onLogout={handleLogout}
+              onBackToPreview={() => setActiveTab('preview')}
             />
           )}
+        </motion.div>
+      </AnimatePresence>
 
-          {activeTab === 'readme' && (
-            <section className="max-w-3xl mx-auto px-6 py-12 md:py-16 space-y-12">
-              {/* Introduction header */}
-              <div className="space-y-4 border-b border-[#E3DEC9] pb-8">
-                <div className="flex items-center gap-2 text-xs font-mono text-[#8C765C] uppercase tracking-wider font-semibold">
-                  <Sparkles className="w-4 h-4 text-[#C1AA89]" />
-                  <span>禅意极简美学原则 & Hugo 编译原理</span>
+      {/* Elegant floating custom login modal */}
+      <AnimatePresence>
+        {showLoginModal && (
+          <div className="fixed inset-0 z-[120] flex items-center justify-center p-4">
+            {/* Blurry dim background */}
+            <motion.div
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              exit={{ opacity: 0 }}
+              onClick={() => {
+                setShowLoginModal(false);
+                setLoginError('');
+              }}
+              className="absolute inset-0 bg-[#151312]/75 backdrop-blur-xs cursor-pointer"
+            />
+
+            {/* Modal Body Container */}
+            <motion.div
+              initial={{ scale: 0.95, y: 15, opacity: 0 }}
+              animate={{ scale: 1, y: 0, opacity: 1 }}
+              exit={{ scale: 0.95, y: 15, opacity: 0 }}
+              transition={{ type: 'spring', duration: 0.4 }}
+              className="relative bg-[#FCFAF6] text-[#2C2A29] rounded-lg border border-[#DDD5C2] w-full max-w-sm p-6 sm:p-8 space-y-6 shadow-2xl z-10"
+            >
+              {/* Close Icon button */}
+              <button
+                type="button"
+                onClick={() => {
+                  setShowLoginModal(false);
+                  setLoginError('');
+                  setUsernameInput('');
+                  setPasswordInput('');
+                }}
+                className="absolute right-4 top-4 text-xl font-mono text-[#9C8F7F] hover:text-[#524436] transition-colors"
+              >
+                &times;
+              </button>
+
+              {/* Title Header area */}
+              <div className="text-center space-y-2">
+                <div className="w-12 h-12 rounded-full bg-[#8E7B65] flex items-center justify-center mx-auto shadow-inner">
+                  <Feather className="w-5.5 h-5.5 text-[#FBF9F5]" />
                 </div>
-                <h2 className="text-3xl font-serif font-medium tracking-tight text-[#1A1918]">
-                  静行大地，无欲而实
-                </h2>
-                <p className="text-sm font-sans text-[#6B655C] leading-relaxed">
-                  本工坊旨在将经典的 **Hugo 静态博客框架编译机制** 与 **东方禅道留白美学** 融合，向您展示如何在不需要数据库、不需要复杂的后端服务器的情况下，只靠 Markdown 语法和 YAML 配置文件来搭建一个极美、极快、极轻、高安全度的多语言博客。
+                <h3 className="font-serif font-medium text-lg tracking-tight text-[#1A1918]">
+                  禅境后台管理员校验
+                </h3>
+                <p className="text-xs text-[#8A7E70]">
+                  登入系统，管理文章、留言交互与多语言配置分类
                 </p>
               </div>
 
-              {/* Grid bento layout for key components */}
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
-                
-                {/* Style guidelines card */}
-                <div className="bg-[#FAF6EE] border border-[#EBE3D0] p-6 rounded-md space-y-4">
-                  <h3 className="font-serif text-lg font-medium text-[#2C2A29] border-b border-[#EBE3D0] pb-2">
-                    🍃 禅意极简设计精髓
-                  </h3>
-                  <ul className="space-y-3.5 text-xs text-[#5C5346] leading-relaxed">
-                    <li>
-                      <strong>大地之色：</strong> 使用温润的米白色（#FBF9F5）作为画布基底，避免高饱和色彩，全站点呈现温暖温和的护眼观感。
-                    </li>
-                    <li>
-                      <strong>东方留白 (Ma)：</strong> 为标题、文章主体提供大量的空间，不添加无关和未被要求的侧边装饰栏，目光得以专注。
-                    </li>
-                    <li>
-                      <strong>文人墨客感：</strong> 正文采用典雅的 Serif 衬线体（搭配精简 Sans 索引），让长文阅读如阅竹简古籍般舒适。
-                    </li>
-                    <li>
-                      <strong>一物两译：</strong> 通过后缀结构对同一话题进行深厚的中文与英文配译，呈现跨越语境的宁静共鸣。
-                    </li>
-                  </ul>
+              {loginError && (
+                <div className="text-center text-xs bg-[#FBF0ED] text-red-700 p-2.5 rounded border border-red-200 font-medium">
+                  {loginError}
+                </div>
+              )}
+
+              {/* Password credentials verification Form */}
+              <form
+                onSubmit={(e) => {
+                  e.preventDefault();
+                  if (usernameInput.trim().toLowerCase() === 'admin' && passwordInput === 'zen2026') {
+                    setIsLoggedIn(true);
+                    localStorage.setItem('hugo_zen_is_logged_in', 'true');
+                    setShowLoginModal(false);
+                    setLoginError('');
+                    setUsernameInput('');
+                    setPasswordInput('');
+                    setActiveTab('admin');
+                  } else {
+                    setLoginError('凭证错误，茶香虽温防微杜渐！');
+                  }
+                }}
+                className="space-y-4 font-sans"
+              >
+                <div className="space-y-1">
+                  <label className="text-[11px] font-semibold text-[#8C8172] tracking-wider uppercase">管理员账号</label>
+                  <input
+                    type="text"
+                    value={usernameInput}
+                    onChange={(e) => setUsernameInput(e.target.value)}
+                    required
+                    placeholder="请输入账号 admin"
+                    className="w-full bg-[#FCFAF6] text-xs px-3.5 py-2.5 border border-[#E4DED3] rounded focus:ring-1 focus:ring-[#8E7B65] focus:border-[#8E7B65] outline-none placeholder-[#A39B8F]/75 transition-all text-[#2C2A29]"
+                  />
                 </div>
 
-                {/* Technical mechanisms card */}
-                <div className="bg-[#FAF6EE] border border-[#EBE3D0] p-6 rounded-md space-y-4">
-                  <h3 className="font-serif text-lg font-medium text-[#2C2A29] border-b border-[#EBE3D0] pb-2">
-                    ⚡ Hugo 静态多语言构建
-                  </h3>
-                  <ul className="space-y-3.5 text-xs text-[#5C5346] leading-relaxed">
-                    <li>
-                      <strong>Markdown 原生载入：</strong> 每一篇博文都是一个纯文本 <code className="text-[#8C765C] bg-[#EDE7DA] px-1 rounded text-[11px] font-mono">.md</code> 文件，通过 Front Matter (YML/TOML标头) 元数据表达分类。
-                    </li>
-                    <li>
-                      <strong>多语言目录映射：</strong> Hugo 会检索后缀 <code className="text-[#8C765C] bg-[#EDE7DA] px-1 rounded text-[11px] font-mono">post.zh.md</code> 和 <code className="text-[#8C765C] bg-[#EDE7DA] px-1 rounded text-[11px] font-mono">post.en.md</code>。在极简部署中无需服务器路由。
-                    </li>
-                    <li>
-                      <strong>静态搜索缓存：</strong> 全文检索在静态编译时由 Hugo 输出诸如 <code className="text-[#8C765C] bg-[#EDE7DA] px-1 rounded text-[11px] font-mono">index.json</code> 的倒排索引文件，浏览器加载极速，无需网络检索后端。
-                    </li>
-                    <li>
-                      <strong>无服务器评论：</strong> 我们模拟了完整的评论接收架构。真实部署中，您可以使用 Waline / Disqus / Giscus (托管在 GitHub Disussions) 等来实现100%全静态零成本维护。
-                    </li>
-                  </ul>
+                <div className="space-y-1">
+                  <label className="text-[11px] font-semibold text-[#8C8172] tracking-wider uppercase">安全凭证密码</label>
+                  <input
+                    type="password"
+                    value={passwordInput}
+                    onChange={(e) => setPasswordInput(e.target.value)}
+                    required
+                    placeholder="请输入密码 zen2026"
+                    className="w-full bg-[#FCFAF6] text-xs px-3.5 py-2.5 border border-[#E4DED3] rounded focus:ring-1 focus:ring-[#8E7B65] focus:border-[#8E7B65] outline-none placeholder-[#A39B8F]/75 transition-all text-[#2C2A29]"
+                  />
                 </div>
 
+                <button
+                  type="submit"
+                  className="w-full py-3 bg-[#8E7B65] hover:bg-[#7D6D58] text-white text-xs font-semibold rounded tracking-widest uppercase transition-colors shadow-xs hover:shadow-md cursor-pointer"
+                >
+                  签署长笺并入室
+                </button>
+              </form>
+
+              {/* Helpful credential tip for validation and preview environment */}
+              <div className="bg-[#FAF6F0] p-4 rounded border border-[#EFEAE0] text-[11px] text-[#8E8170] leading-relaxed select-none">
+                <span className="font-semibold text-[#6C5E4E] block mb-1">💡 默认环境出入凭证：</span>
+                <p>管理员账户：<code className="bg-[#EEE7DC] text-[#705F4B] px-1 py-0.2 rounded font-mono font-bold">admin</code></p>
+                <p className="mt-1">预设密码：<code className="bg-[#EEE7DC] text-[#705F4B] px-1 py-0.2 rounded font-mono font-bold">zen2026</code></p>
               </div>
 
-              {/* Blockquote decoration */}
-              <div className="py-6 border-y border-[#E3DEC9] text-center italic text-sm text-[#7A6E5C] font-serif">
-                “ 井枯水竭，风不息时，坐看闲叶随流。世事虽繁，有一方安宁桌台足矣。 ”
-              </div>
-
-              {/* Steps for quick deployment */}
-              <div className="space-y-4">
-                <h3 className="font-serif text-lg font-medium text-[#1A1918]">
-                  🚀 快速发布您的极简世界：
-                </h3>
-                <div className="space-y-3.5 text-xs sm:text-sm text-[#5C5346] leading-relaxed">
-                  <p>
-                    1. 在顶部的<strong>“静态工作台”</strong>调整博客名称、作者简介与您认同的禅言。
-                  </p>
-                  <p>
-                    2. 新增或修改各语言下的 Markdown 内容，点击保存将使本地控制台自动编译最新静态库。
-                  </p>
-                  <p>
-                    3. 在<strong>“前台预览”</strong>里点击各分类与多国语言，真实调试访客视角。
-                  </p>
-                  <p>
-                    4. 点击工作台右侧的<strong>“复刻代码 (Copy)”</strong>，将生成的 TOML 与 MD 直接保存在您本地的 Hugo 项目中，零差错极速上线！
-                  </p>
-                </div>
-              </div>
-
-            </section>
-          )}
-        </motion.div>
+            </motion.div>
+          </div>
+        )}
       </AnimatePresence>
 
     </div>

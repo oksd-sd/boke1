@@ -48,6 +48,28 @@ export function renderMarkdown(markdown: string): React.ReactNode {
       flushList();
     }
 
+    // Handle dividers
+    if (line === '---' || line === '***' || line === '◇ ◇ ◇') {
+      elements.push(
+        <div key={currentKey++} className="flex justify-center items-center gap-3 my-8 select-none">
+          <span className="w-1 h-1 rounded-full bg-[#C1B5A3]/60" />
+          <span className="w-2 h-2 rotate-45 border border-[#8C765C] bg-transparent flex items-center justify-center text-[6px]" />
+          <span className="w-1 h-1 rounded-full bg-[#C1B5A3]/60" />
+        </div>
+      );
+      continue;
+    }
+
+    // Handle Centered verses / Poetry
+    if (line.startsWith('~ ')) {
+      elements.push(
+        <p key={currentKey++} className="text-center font-serif text-base italic text-[#5C5753] tracking-wider my-4 leading-relaxed font-medium">
+          {line.substring(2)}
+        </p>
+      );
+      continue;
+    }
+
     // Handle Headings
     if (line.startsWith('# ')) {
       elements.push(

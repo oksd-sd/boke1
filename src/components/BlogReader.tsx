@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import { Post, Comment, HugoConfig } from '../types';
 import { renderMarkdown } from '../utils/markdown';
-import { Search, Globe, ChevronLeft, MessageSquare, Send, Calendar, Clock, Tag, Folder, Heart, Sparkles } from 'lucide-react';
+import { Search, Globe, ChevronLeft, MessageSquare, Send, Calendar, Clock, Tag, Folder, Heart, Sparkles, User, Settings } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 
 interface BlogReaderProps {
@@ -11,6 +11,8 @@ interface BlogReaderProps {
   language: 'zh' | 'en';
   setLanguage: (lang: 'zh' | 'en') => void;
   onAddComment: (comment: Comment) => void;
+  onAdminClick: () => void;
+  isLoggedIn: boolean;
 }
 
 export default function BlogReader({
@@ -19,7 +21,9 @@ export default function BlogReader({
   comments,
   language,
   setLanguage,
-  onAddComment
+  onAddComment,
+  onAdminClick,
+  isLoggedIn
 }: BlogReaderProps) {
   const [selectedPostSlug, setSelectedPostSlug] = useState<string | null>(null);
   const [searchQuery, setSearchQuery] = useState('');
@@ -199,6 +203,15 @@ export default function BlogReader({
             >
               <Globe className="w-3.5 h-3.5" />
               <span>{language === 'zh' ? 'EN / 英文' : 'ZH / 中文'}</span>
+            </button>
+
+            {/* Admin console trigger */}
+            <button
+              onClick={onAdminClick}
+              className="flex items-center gap-1.5 px-3.5 py-1.5 bg-[#8C7B65] hover:bg-[#766753] text-[#FAF8F5] text-xs rounded-md font-sans transition-all cursor-pointer shadow-xs"
+            >
+              <User className="w-3.5 h-3.5" />
+              <span>{isLoggedIn ? '后台控制台' : '管理员'}</span>
             </button>
           </div>
         </header>
